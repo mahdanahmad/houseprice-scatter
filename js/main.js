@@ -17,7 +17,8 @@ $( document ).ready(function() {
 
 	let parseTime		= d3.timeParse("%m-%Y");
 	let voronoi			= d3.voronoi().x((o) => (o.x)).y((o) => (y(o.val))).extent([[-1, -1], [width + 1, height + 1]]);
-	let line			= d3.line().x((o) => (o.x)).y((o) => (o.y));
+	let line			= d3.line().x((o) => (o.x)).y((o) => (o.y)).curve(d3.curveCardinal);
+	let underlineProv	= d3.line().x((o) => (o.x)).y((o) => (o.y));
 
 	let svg = d3.select("#scatter-container").append("svg")
 		.attr('width', width + margin.left + margin.right)
@@ -25,13 +26,25 @@ $( document ).ready(function() {
 		.append('g')
 		  .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
+	svg.append("path")
+		.attr("id", "crosser")
+		.attr("d", "");
+
+	svg.append("path")
+		.attr("id", "underline")
+		.attr("d", "");
+
 	d3.csv("public/data.csv", (err, raw) => {
 		if (err) throw err;
 
 		let grouped	= _.chain(raw).groupBy('house_cat').mapValues((o) => (_.map(o, (d) => ({
 			prov	: _.kebabCase(d.province_code),
 			val		: _.round(parseFloat(d.median)),
-			date	: parseTime(d.month + '-' + d.year)
+			date	: parseTime(d.month + '-' + d.year),
+			// q0		: _.round(parseFloat(d.q25)) - (1.5 * _.round(parseFloat(d.IQR))),
+			q25		: _.round(parseFloat(d.q25)),
+			q75		: _.round(parseFloat(d.q75)),
+			// q100	: _.round(parseFloat(d.q75)) + (1.5 * _.round(parseFloat(d.IQR))),
 		})))).value();
 
 		let data	= grouped[tab];
@@ -58,10 +71,6 @@ $( document ).ready(function() {
 		let poly	= voronoi(data).polygons();
 		data		= data.map((o, i) => (_.assign(o, { poly: poly[i] })))
 
-		svg.append("path")
-			.attr("id", "crosser")
-			.attr("d", "");
-
 		svg.append("g")
 			.attr("class", "x axis")
 			.attr("transform", "translate(0," + height + ")")
@@ -69,7 +78,7 @@ $( document ).ready(function() {
 
 		svg.append("g")
 			.attr("class", "y axis")
-			.call(d3.axisLeft(y).ticks(8, "s").tickSize(-width));
+			.call(d3.axisLeft(y).ticks(8).tickFormat((o) => ((o / 1000000) + "jt")).tickSize(-width));
 
 		let provHeight	= (height / (provs.length));
 		svg.append("g").attr("transform", "translate(" + (margin.left + width) + ",0)").selectAll("prov").data(provs)
@@ -78,7 +87,14 @@ $( document ).ready(function() {
 				.attr("class", "prov cursor-pointer")
 				.attr("x", "0")
 				.attr("y", (o, i) => ( i * provHeight ))
-				.text((o) => (o.shown));
+				.text((o) => (o.shown))
+				// .on("mouseover", (o) => {
+				// 	showLine(o.base);
+				// })
+				// .on('mouseleave', (o) => { $( 'line.plot.' + o.base ).addClass('hidden'); })
+				.on('click', (o) => {
+					showLine(o.base, true);
+				});
 
 		svg.append('circle')
 			.attr("id", "onhover")
@@ -92,27 +108,67 @@ $( document ).ready(function() {
 			.attr("class", (o) => (o.prov + " dot"))
 			.attr("r", 3)
 			.attr("fill", (o) => (colorScale(o.val)))
-			.attr("cx", (d) => (d.x))
-			.attr("cy", (d) => (y(d.val)));
+			.attr("cx", (o) => (o.x))
+			.attr("cy", (o) => (y(o.val)));
 
 		groupCircle.append("path")
 			.attr("class", "polygons")
 			.attr("d", (o) => (o.poly ? "M" + o.poly.join("L") + "Z" : null));
+
+		groupCircle.append("line")
+			.attr("class", (o) => ("hidden plot " + o.prov))
+			.style("stroke-dasharray", ("3, 3"))
+			.attr("x1", (o) => (o.x))
+			.attr("y1", (o) => (y(o.q25)))
+			.attr("x2", (o) => (o.x))
+			.attr("y2", (o) => (y(o.q75)));
 
 		groupCircle.on('mouseover', (o) => {
 			d3.select('#onhover')
 				.attr('cx', o.x)
 				.attr('cy', y(o.val))
 
+			showLine(o.prov);
 			d3.select('#onhover').classed('hidden', false);
+		}).on('mouseout', (o) => { $( 'line.plot.' + o.prov ).addClass('hidden'); });
 
-			console.log($( '#txt-' + o.prov ).outerWidth(true));
-
-			let addtn	= _.times(2, (i) => ({ x: -10 + margin.left + width + (i == 0 ? 0 : margin.right), y: parseFloat($( '#txt-' + o.prov ).attr('y')) + 5 }));
-			let path	= _.chain($( '.dot.' + o.prov ).map(function(d) { return ({ x: parseFloat($(this).attr('cx')), y: parseFloat($(this).attr('cy')) }) })).sortBy('x').concat(addtn).value();
-			d3.select("path#crosser").transition().attr("d", line(path));
-		});
-
-		svg.on('mouseleave', () => { d3.select('#onhover').classed('hidden', true); d3.select("path#crosser").transition().attr("d", ""); })
+		svg.on('mouseleave', () => { d3.select('#onhover').classed('hidden', true); d3.select("path#crosser").transition().attr("d", ""); d3.select("path#underline").transition().attr("d", ""); })
 	});
+
+	function showLine(prov, forced) {
+		let addtn	= [{ x: -10 + margin.left + width, y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }];
+		let path	= _.chain($( '.dot.' + prov ).map(function(o) { return ({ x: parseFloat($(this).attr('cx')), y: parseFloat($(this).attr('cy')) }) })).sortBy('x').concat(addtn).value();
+
+		let undrln	= _.times(2, (i) => ({ x: -10 + margin.left + width + (i == 0 ? 0 : margin.right), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }));
+
+		if (forced) {
+			let arr	= $( 'path.forced-cross' ).map(function(o) { return($(this).attr('id').replace('cross-', '')); });
+
+			if (_.includes(arr, prov)) {
+				d3.select( 'path#cross-' + prov ).remove()
+				d3.select( 'path#underline-' + prov ).remove()
+
+				$( 'line.plot.' + prov ).removeClass('forced');
+			} else {
+				svg.append("path")
+					.attr("id", "cross-" + prov)
+					.attr("class", "forced-cross")
+					.attr("d", line(path));
+
+				svg.append("path")
+					.attr("id", "underline-" + prov)
+					.attr("class", "forced-underline")
+					.attr("d", underlineProv(undrln));
+
+				$( 'line.plot.' + prov ).addClass('forced');
+			}
+
+		} else {
+			d3.select("path#crosser").transition().attr("d", line(path));
+			d3.select("path#underline").transition().attr("d", underlineProv(undrln));
+
+			$( 'line.plot.' + prov ).removeClass('hidden');
+		}
+
+	}
 });

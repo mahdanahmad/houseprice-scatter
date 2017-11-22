@@ -36,9 +36,10 @@ div#root {
 			.axis path { stroke: transparent; }
 			.axis text { fill: black; }
 			text.prov { font-size: 11px; }
-			path#crosser { stroke: #ccc; stroke-width: 2px; fill: none; }
+			path#crosser, path#underline, path.forced-cross, path.forced-underline  { stroke: lightslategrey; stroke-width: 2px; fill: none; }
 			path.polygons { opacity: 0; }
 			circle#onhover { fill: none; stroke: black; stroke-width: 2px; }
+			line.plot { stroke: black; &.forced { display: block!important; }}
 		}
 	}
 }
