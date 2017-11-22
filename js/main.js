@@ -1,3 +1,11 @@
+const tabs		= [
+	{ key: 'A', text: '0 - 75 m&#178' },
+	{ key: 'B', text: '76 - 150 m&#178' },
+	{ key: 'C', text: '150 - 300 m&#178' },
+	{ key: 'D', text: '300+ m&#178' },
+];
+const plotWidth	= 6;
+
 $( document ).ready(function() {
 	d3.select('#barchart-container').selectAll('svg').remove();
 
@@ -12,8 +20,8 @@ $( document ).ready(function() {
 	let y 				= d3.scaleLinear().range([height, 0]);
 	let colorScale		= d3.scaleLinear().range(["orange", "orange", "orange"]);
 
-	let tabs			= ['A', 'B', 'C', 'D'];
-	let tab				= _.head(tabs);
+
+	let tab				= _.head(tabs).key;
 
 	let parseTime		= d3.timeParse("%m-%Y");
 	let voronoi			= d3.voronoi().x((o) => (o.x)).y((o) => (y(o.val))).extent([[-1, -1], [width + 1, height + 1]]);
@@ -21,7 +29,6 @@ $( document ).ready(function() {
 	let underlineProv	= d3.line().x((o) => (o.x)).y((o) => (o.y));
 
 	let activeLine		= [];
-	let plotWidth		= 6;
 
 	let svg = d3.select("#scatter-container").append("svg")
 		.attr('width', width + margin.left + margin.right)
@@ -29,18 +36,15 @@ $( document ).ready(function() {
 		.append('g')
 		  .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-	svg.append("path")
-		.attr("id", "crosser")
-		.attr("d", "");
+	createTabs();
+	createLegend();
 
-	svg.append("path")
-		.attr("id", "underline")
-		.attr("d", "");
+	let grouped		= [];
 
 	d3.csv("public/data.csv", (err, raw) => {
 		if (err) throw err;
 
-		let grouped	= _.chain(raw).groupBy('house_cat').mapValues((o) => (_.map(o, (d) => ({
+		grouped		= _.chain(raw).groupBy('house_cat').mapValues((o) => (_.map(o, (d) => ({
 			prov	: _.kebabCase(d.province_code),
 			val		: _.round(parseFloat(d.median)),
 			date	: parseTime(d.month + '-' + d.year),
@@ -48,7 +52,12 @@ $( document ).ready(function() {
 			q75		: _.round(parseFloat(d.q75)),
 		})))).value();
 
-		let data	= grouped[tab];
+		createChart(grouped[tab]);
+	});
+
+	function createChart(data) {
+		svg.selectAll("*").remove();
+
 		let provs	= _.chain(data).map('prov').uniq().map((o) => ({ shown: o.split('-').map((d) => (_.includes(['di', 'dki'], d) ? d.toUpperCase() : _.capitalize(d))).join(' '), base: o })).sortBy().value();
 
 		let maxDate	= _.clone(d3.max(data, (d) => (d.date)));
@@ -71,6 +80,14 @@ $( document ).ready(function() {
 		data		= data.map((o) => (_.assign(o, { x : x(o.date) + _.random(-(space / 2), (space / 2)) })))
 		let poly	= voronoi(data).polygons();
 		data		= data.map((o, i) => (_.assign(o, { poly: poly[i] })))
+
+		svg.append("path")
+			.attr("id", "crosser")
+			.attr("d", "");
+
+		svg.append("path")
+			.attr("id", "underline")
+			.attr("d", "");
 
 		svg.append("g")
 			.attr("class", "x axis")
@@ -161,7 +178,7 @@ $( document ).ready(function() {
 			.on('click', (o) => { showLine(o.prov, true); });
 
 		svg.on('mouseleave', () => { d3.select('#onhover').classed('hidden', true); d3.select("path#crosser").transition().attr("d", ""); d3.select("path#underline").transition().attr("d", ""); })
-	});
+	}
 
 	function showLine(prov, forced) {
 		if (forced) {
@@ -185,6 +202,32 @@ $( document ).ready(function() {
 
 			$( 'line.plot.' + prov ).removeClass('hidden');
 		}
-
 	}
+
+	function createLegend() {
+		let legend	= d3.select("#legend-container").append("svg").attr('transform', 'translate(' + margin.left + ',' + (0) + ')');
+
+		let iqr		= legend.append('g');
+		let iqrWdth	= 50;
+		iqr.append("line").attr("x1", 1).attr("y1", 0).attr("x2", 1).attr("y2", plotWidth * 2);
+		iqr.append("line").attr("x1", iqrWdth).attr("y1", 0).attr("x2", iqrWdth).attr("y2", plotWidth * 2);
+		iqr.append("line").attr("x1", 1).attr("y1", plotWidth).attr("x2", iqrWdth).attr("y2", plotWidth);
+		iqr.append("text").attr("y", plotWidth * 2).attr("x", (iqrWdth + 10)).text("interquartile range");
+
+		let circle	= legend.append('g');
+		let crclStr	= 200;
+		circle.append("circle").attr("r", 6).attr('fill', 'orange').attr("cx", crclStr).attr("cy", (plotWidth + 1));
+		iqr.append("text").attr("y", plotWidth * 2).attr("x", (crclStr + 15)).text("median");
+	}
+
+	function createTabs() {
+		$( '#tabs' ).html(tabs.map((o) => ("<li id='tab-" + o.key + "' class='cursor-pointer " + (o.key == tab ? 'active' : '') + "' value='" + o.key + "'>" + o.text + "</li>")));
+	}
+
+	$( "ul#tabs > li" ).click(function() {
+		$( "ul#tabs > li.active" ).removeClass('active');
+		$( this ).addClass('active');
+
+		createChart(grouped[$( this ).attr('value')])
+	})
 });
