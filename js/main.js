@@ -4,21 +4,24 @@ $( document ).ready(function() {
 	let canvasWidth		= $('#scatter-container').outerWidth(true);
 	let canvasHeight	= $('#scatter-container').height();
 
-	let margin 			= { top: 25, right: 150, bottom: 25, left: 50 };
+	let margin 			= { top: 25, right: 50, bottom: 25, left: 125 };
 	let width			= canvasWidth - margin.right - margin.left;
 	let height			= canvasHeight - margin.top - margin.bottom;
 
 	let x 				= d3.scaleTime().range([0, width]);
 	let y 				= d3.scaleLinear().range([height, 0]);
-	let colorScale		= d3.scaleLinear().range(["lightblue", "orange", "red"]);
+	let colorScale		= d3.scaleLinear().range(["orange", "orange", "orange"]);
 
 	let tabs			= ['A', 'B', 'C', 'D'];
 	let tab				= _.head(tabs);
 
 	let parseTime		= d3.timeParse("%m-%Y");
 	let voronoi			= d3.voronoi().x((o) => (o.x)).y((o) => (y(o.val))).extent([[-1, -1], [width + 1, height + 1]]);
-	let line			= d3.line().x((o) => (o.x)).y((o) => (o.y)).curve(d3.curveCardinal);
+	let line			= d3.line().x((o) => (o.x)).y((o) => (o.y)).curve(d3.curveCatmullRom);
 	let underlineProv	= d3.line().x((o) => (o.x)).y((o) => (o.y));
+
+	let activeLine		= [];
+	let plotWidth		= 6;
 
 	let svg = d3.select("#scatter-container").append("svg")
 		.attr('width', width + margin.left + margin.right)
@@ -41,10 +44,8 @@ $( document ).ready(function() {
 			prov	: _.kebabCase(d.province_code),
 			val		: _.round(parseFloat(d.median)),
 			date	: parseTime(d.month + '-' + d.year),
-			// q0		: _.round(parseFloat(d.q25)) - (1.5 * _.round(parseFloat(d.IQR))),
 			q25		: _.round(parseFloat(d.q25)),
 			q75		: _.round(parseFloat(d.q75)),
-			// q100	: _.round(parseFloat(d.q75)) + (1.5 * _.round(parseFloat(d.IQR))),
 		})))).value();
 
 		let data	= grouped[tab];
@@ -78,10 +79,11 @@ $( document ).ready(function() {
 
 		svg.append("g")
 			.attr("class", "y axis")
-			.call(d3.axisLeft(y).ticks(8).tickFormat((o) => ((o / 1000000) + "jt")).tickSize(-width));
+			.attr("transform", "translate(" + width + "," + 0 + ")")
+			.call(d3.axisRight(y).ticks(8).tickFormat((o) => ((o / 1000000) + "jt")).tickSize(-width));
 
 		let provHeight	= (height / (provs.length));
-		svg.append("g").attr("transform", "translate(" + (margin.left + width) + ",0)").selectAll("prov").data(provs)
+		svg.append("g").attr("transform", "translate(" + (-15) + "," + 0 + ")").selectAll("prov").data(provs)
 			.enter().append("text")
 				.attr("id", (o) => ("txt-" + o.base))
 				.attr("class", "prov cursor-pointer")
@@ -92,15 +94,24 @@ $( document ).ready(function() {
 				// 	showLine(o.base);
 				// })
 				// .on('mouseleave', (o) => { $( 'line.plot.' + o.base ).addClass('hidden'); })
-				.on('click', (o) => {
-					showLine(o.base, true);
-				});
+				.on('click', (o) => { showLine(o.base, true); });
+
+		let forced	= svg.append("g").attr("id", "forced-group").selectAll(".forced-group").data(_.chain(data).groupBy('prov').map((val, key) => ({ key, val})).value()).enter().append("g");
+
+		forced.append('path')
+			.attr("id", (o) => ("underline-" + o.key))
+			.attr("class", "forced-underline hidden")
+			.attr("d", (o) => (underlineProv(_.times(2, (i) => ({ x: -10 - (i == 0 ? 0 : margin.left), y: parseFloat($( '#txt-' + o.key ).attr('y')) + 5 })))));
+
+		forced.append('path')
+			.attr("id", (o) => ("cross-" + o.key))
+			.attr("class", "forced-cross hidden")
+			.attr("d", (o) => (line([{ x: -10, y: parseFloat($( '#txt-' + o.key ).attr('y')) + 5 }].concat(o.val.map((d) => ({ x: d.x, y: y(d.val) }))))));
 
 		svg.append('circle')
 			.attr("id", "onhover")
 			.attr("class", "hidden")
 			.attr("r", 7);
-
 
 		let groupCircle	= svg.append("g").attr('id', 'dot-crowd').selectAll(".group-circle").data(data).enter().append("g")
 
@@ -117,54 +128,59 @@ $( document ).ready(function() {
 
 		groupCircle.append("line")
 			.attr("class", (o) => ("hidden plot " + o.prov))
-			.style("stroke-dasharray", ("3, 3"))
 			.attr("x1", (o) => (o.x))
 			.attr("y1", (o) => (y(o.q25)))
 			.attr("x2", (o) => (o.x))
 			.attr("y2", (o) => (y(o.q75)));
 
-		groupCircle.on('mouseover', (o) => {
-			d3.select('#onhover')
-				.attr('cx', o.x)
-				.attr('cy', y(o.val))
+		groupCircle.append("line")
+			.attr("class", (o) => ("hidden plot " + o.prov))
+			.attr("x1", (o) => (o.x - plotWidth))
+			.attr("y1", (o) => (y(o.q25)))
+			.attr("x2", (o) => (o.x + plotWidth))
+			.attr("y2", (o) => (y(o.q25)));
 
-			showLine(o.prov);
-			d3.select('#onhover').classed('hidden', false);
-		}).on('mouseout', (o) => { $( 'line.plot.' + o.prov ).addClass('hidden'); });
+		groupCircle.append("line")
+			.attr("class", (o) => ("hidden plot " + o.prov))
+			.attr("x1", (o) => (o.x - plotWidth))
+			.attr("y1", (o) => (y(o.q75)))
+			.attr("x2", (o) => (o.x + plotWidth))
+			.attr("y2", (o) => (y(o.q75)));
+
+		groupCircle
+			.on('mouseover', (o) => {
+				d3.select('#onhover')
+					.attr('cx', o.x)
+					.attr('cy', y(o.val))
+
+				showLine(o.prov);
+				d3.select('#onhover').classed('hidden', false);
+				$( 'circle.dot:not(.' + o.prov + '), path.forced-cross, path.forced-underline' ).addClass('unintended');
+			})
+			.on('mouseout', (o) => { $( 'line.plot.' + o.prov ).addClass('hidden'); $( 'circle.dot, path.forced-cross, path.forced-underline' ).removeClass('unintended'); })
+			.on('click', (o) => { showLine(o.prov, true); });
 
 		svg.on('mouseleave', () => { d3.select('#onhover').classed('hidden', true); d3.select("path#crosser").transition().attr("d", ""); d3.select("path#underline").transition().attr("d", ""); })
 	});
 
 	function showLine(prov, forced) {
-		let addtn	= [{ x: -10 + margin.left + width, y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }];
-		let path	= _.chain($( '.dot.' + prov ).map(function(o) { return ({ x: parseFloat($(this).attr('cx')), y: parseFloat($(this).attr('cy')) }) })).sortBy('x').concat(addtn).value();
-
-		let undrln	= _.times(2, (i) => ({ x: -10 + margin.left + width + (i == 0 ? 0 : margin.right), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }));
-
 		if (forced) {
-			let arr	= $( 'path.forced-cross' ).map(function(o) { return($(this).attr('id').replace('cross-', '')); });
-
-			if (_.includes(arr, prov)) {
-				d3.select( 'path#cross-' + prov ).remove()
-				d3.select( 'path#underline-' + prov ).remove()
-
-				$( 'line.plot.' + prov ).removeClass('forced');
+			if (_.includes(activeLine, prov)) {
+				_.pull(activeLine, prov);
+				d3.select( 'path#cross-' + prov ).classed('hidden', true);
+				d3.select( 'path#underline-' + prov ).classed('hidden', true);
 			} else {
-				svg.append("path")
-					.attr("id", "cross-" + prov)
-					.attr("class", "forced-cross")
-					.attr("d", line(path));
-
-				svg.append("path")
-					.attr("id", "underline-" + prov)
-					.attr("class", "forced-underline")
-					.attr("d", underlineProv(undrln));
-
-				$( 'line.plot.' + prov ).addClass('forced');
+				activeLine.push(prov);
+				d3.select( 'path#cross-' + prov ).classed('hidden', false);
+				d3.select( 'path#underline-' + prov ).classed('hidden', false);
 			}
-
 		} else {
-			d3.select("path#crosser").transition().attr("d", line(path));
+			let addtn	= [{ x: -10, y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }];
+			let path	= _.chain($( '.dot.' + prov ).map(function(o) { return ({ x: parseFloat($(this).attr('cx')), y: parseFloat($(this).attr('cy')) }) })).sortBy('x').value();
+
+			let undrln	= _.times(2, (i) => ({ x: -10 - (i == 0 ? 0 : margin.left), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }));
+
+			d3.select("path#crosser").transition().attr("d", line(addtn.concat(path)));
 			d3.select("path#underline").transition().attr("d", underlineProv(undrln));
 
 			$( 'line.plot.' + prov ).removeClass('hidden');

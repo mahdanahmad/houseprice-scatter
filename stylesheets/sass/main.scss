@@ -35,11 +35,13 @@ div#root {
 			.axis line { stroke: #ccc; }
 			.axis path { stroke: transparent; }
 			.axis text { fill: black; }
-			text.prov { font-size: 11px; }
+			text.prov { font-size: 11px; text-anchor: end; }
 			path#crosser, path#underline, path.forced-cross, path.forced-underline  { stroke: lightslategrey; stroke-width: 2px; fill: none; }
 			path.polygons { opacity: 0; }
 			circle#onhover { fill: none; stroke: black; stroke-width: 2px; }
-			line.plot { stroke: black; &.forced { display: block!important; }}
+			line.plot { stroke: lightslategrey; &.forced { display: block!important; }}
+
+			circle.dot.unintended, path.forced-cross.unintended, path.forced-underline.unintended { opacity: .2; }
 		}
 	}
 }
