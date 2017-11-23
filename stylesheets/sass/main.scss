@@ -30,30 +30,31 @@ html, body, body > div#root {
 div#root {
     max-width: 1100px; margin: 0px auto!important;  margin-bottom: 50px;
 	#title { font-size: 25px; line-height: 65px; }
+	#tabs-container {
+		ul#tabs {
+			display: inline-block;
+			li { display: inline-block; margin: 0 5px; padding: 0px 5px 5px; font-family: "SF Bold"; &.active { color: orange; }}
+		}
+	}
 	#scatter-container {
-		width: 100%; height: 600px;
+		width: 100%; height: 600px; position: relative;
+		#tooltip { position: absolute; font-size: 11px; background: black; color: white; padding: 3px 6px; border-radius: 3px; opacity: .6; text-align: center; }
 		svg {
 			.axis line { stroke: #ccc; }
 			.axis path { stroke: transparent; }
 			.axis text { fill: black; }
-			text.prov { font-size: 11px; text-anchor: end; }
-			path#crosser, path#underline, path.forced-cross, path.forced-underline  { stroke: lightslategrey; stroke-width: 2px; fill: none; }
+			text.prov, #dot-crowd text { font-size: 11px; }
+			path#crosser, path#underline { stroke: orange; stroke-width: 2px; fill: none; }
+			path.forced-cross, path.forced-underline { stroke: lightslategrey; stroke-width: 2px; fill: none; }
 			path.polygons { opacity: 0; }
 			circle#onhover { fill: none; stroke: black; stroke-width: 2px; }
 			line.plot { stroke: lightslategrey; &.forced { display: block!important; }}
 
-			circle.dot.unintended, path.forced-cross.unintended, path.forced-underline.unintended { opacity: .2; }
+			circle.dot.unintended { opacity: .2; }
 		}
 	}
 	#legend-container {
-		margin-top: 20px; position: relative;
+		margin-top: 30px; position: relative; font-size: 12px; text-align: right; padding-right: 90px;
 		svg { line { stroke: lightslategrey; } }
-		#tabs-container {
-			position: absolute; right: 0px; top: -3px;
-			ul#tabs {
-				display: inline-block;
-				li { display: inline-block; margin: 0 5px; padding: 0px 5px 5px; &.active { border-bottom: 1px solid; border-radius: 2px; }}
-			}
-		}
 	}
 }
