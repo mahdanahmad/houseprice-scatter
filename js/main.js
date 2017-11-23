@@ -118,11 +118,7 @@ $( document ).ready(function() {
 				})
 				.on('click', (o) => {
 					showLine(o.base, true);
-					if (activeLine.length == 0) {
-						showLine(o.base);
-					} else if (activeLine.length == 1) {
-
-					}
+					showLine(o.base);
 				});
 
 		let forced	= svg.append("g").attr("id", "forced-group").selectAll(".forced-group").data(_.chain(data).groupBy('prov').map((val, key) => ({ key, val})).value()).enter().append("g");
@@ -316,6 +312,7 @@ $( document ).ready(function() {
 	$( "ul#tabs > li" ).click(function() {
 		$( "ul#tabs > li.active" ).removeClass('active');
 		$( this ).addClass('active');
+		activeLine	= [];
 
 		createChart(grouped[$( this ).attr('value')])
 	})
