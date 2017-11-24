@@ -94,9 +94,9 @@ $( document ).ready(function() {
 			.attr("id", "crosser")
 			.attr("d", "");
 
-		svg.append("path")
-			.attr("id", "underline")
-			.attr("d", "");
+		// svg.append("path")
+		// 	.attr("id", "underline")
+		// 	.attr("d", "");
 
 		let provHeight	= (height / (provs.length));
 		svg.append("g").attr("id", "groups-prov").attr("transform", "translate(" + (margin.left + width) + "," + 0 + ")").selectAll("prov").data(provs)
@@ -113,8 +113,9 @@ $( document ).ready(function() {
 					if (!$( 'div#tooltip' ).hasClass('hidden')) { $( 'div#tooltip' ).addClass('hidden'); };
 				})
 				.on('mouseout', (o) => {
-					d3.select("path#crosser").transition().attr("d", ""); d3.select("path#underline").transition().attr("d", "");
-					if (!(_.includes(activeLine, o.base) && activeLine.length == 1)) { hideLine(o.base); }
+					d3.select("path#crosser").transition().attr("d", "");
+					// d3.select("path#underline").transition().attr("d", "");
+					if (!(_.includes(activeLine, o.base) && activeLine.length == 1)) { hideLine(o.base); } else { $( 'text.prov#txt-' + o.base ).removeClass("hover"); }
 				})
 				.on('click', (o) => {
 					showLine(o.base, true);
@@ -126,12 +127,16 @@ $( document ).ready(function() {
 		forced.append('path')
 			.attr("id", (o) => ("underline-" + o.key))
 			.attr("class", "forced-underline hidden")
-			.attr("d", (o) => (underlineProv(_.times(2, (i) => ({ x: (margin.left + width - 10) + (i == 0 ? margin.right : 0), y: parseFloat($( '#txt-' + o.key ).attr('y')) + 5 })))));
+			.attr("d", (o) => (underlineProv(
+				_.chain(o.val).maxBy("x").castArray().map((d) => ({ x: d.x, y: y(d.val) }))
+					.concat(_.times(2, (i) => ({ x: (margin.left + width - 10) + (i !== 0 ? margin.right : 0), y: parseFloat($( '#txt-' + o.key ).attr('y')) + 5 })))
+					.value()
+			)));
 
 		forced.append('path')
 			.attr("id", (o) => ("cross-" + o.key))
 			.attr("class", "forced-cross hidden")
-			.attr("d", (o) => (line(o.val.map((d) => ({ x: d.x, y: y(d.val) })).concat([{ x: (margin.left + width - 10), y: parseFloat($( '#txt-' + o.key ).attr('y')) + 5 }]))));
+			.attr("d", (o) => (line(o.val.map((d) => ({ x: d.x, y: y(d.val) })))));
 
 		svg.append('circle')
 			.attr("id", "onhover")
@@ -229,7 +234,8 @@ $( document ).ready(function() {
 		d3.select('#scatter-container').on('mouseleave', () => {
 			d3.select('#onhover').classed('hidden', true);
 			d3.select('#tooltip').classed('hidden', true);
-			d3.select("path#crosser").transition().attr("d", ""); d3.select("path#underline").transition().attr("d", "");
+			d3.select("path#crosser").transition().attr("d", "");
+			// d3.select("path#underline").transition().attr("d", "");
 		})
 	}
 
@@ -239,6 +245,7 @@ $( document ).ready(function() {
 		$( 'line.plot.' + prov ).addClass('hidden');
 		$( 'text.detil.' + prov ).addClass('hidden');
 		$( 'circle.dot.' + (prov) ).addClass('unintended');
+		$( 'text.prov#txt-' + prov ).removeClass("hover");
 		if (activeLine.length == 0) { $( 'circle.dot:not(.' + (prov) + ')' ).removeClass('unintended'); }
 	};
 
@@ -248,10 +255,12 @@ $( document ).ready(function() {
 				_.pull(activeLine, prov);
 				d3.select( 'path#cross-' + prov ).classed('hidden', true);
 				d3.select( 'path#underline-' + prov ).classed('hidden', true);
+				$( 'text.prov#txt-' + prov ).removeClass("selected");
 			} else {
 				activeLine.push(prov);
 				d3.select( 'path#cross-' + prov ).classed('hidden', false);
 				d3.select( 'path#underline-' + prov ).classed('hidden', false);
+				$( 'text.prov#txt-' + prov ).addClass("selected");
 			}
 
 			$( 'circle.dot:not(' + activeLine.map((o) => ('.' + o)).join(', ') + ')' ).addClass('unintended');
@@ -276,13 +285,14 @@ $( document ).ready(function() {
 			$( 'circle.dot:not(' + activeLine.concat([prov]).map((d) => '.' + d).join(', ') + ')' ).addClass('unintended');
 			$( activeLine.concat([prov]).map((d) => 'circle.dot.' + d).join(', ') ).removeClass('unintended');
 
-			let addtn	= [{ x: (margin.left + width - 10), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }];
+			// let addtn	= [{ x: (margin.left + width - 10), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }];
 			let path	= _.chain($( '.dot.' + prov ).map(function(o) { return ({ x: parseFloat($(this).attr('cx')), y: parseFloat($(this).attr('cy')) }) })).sortBy('x').value();
 
-			let undrln	= _.times(2, (i) => ({ x: (margin.left + width - 10) + (i == 0 ? margin.right : 0), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }));
+			let undrln	= _.times(2, (i) => ({ x: (margin.left + width - 10) + (i !== 0 ? margin.right : 0), y: parseFloat($( '#txt-' + prov ).attr('y')) + 5 }));
 
-			d3.select("path#crosser").transition().attr("d", line(path.concat(addtn)));
-			d3.select("path#underline").transition().attr("d", underlineProv(undrln));
+			d3.select("path#crosser").transition().attr("d", line(path));
+			$("text.prov#txt-" + prov).addClass("hover");
+			// d3.select("path#underline").transition().attr("d", underlineProv([_.last(path)].concat(undrln)));
 
 			$( 'line.plot.' + prov ).removeClass('hidden');
 			$( 'text.detil.' + prov ).removeClass('hidden');

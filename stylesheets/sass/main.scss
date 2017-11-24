@@ -44,8 +44,15 @@ div#root {
 			.axis path { stroke: transparent; }
 			.axis text { fill: black; }
 			text.prov, #dot-crowd text { font-size: 11px; }
-			path#crosser, path#underline { stroke: orange; stroke-width: 2px; fill: none; }
-			path.forced-cross, path.forced-underline { stroke: lightslategrey; stroke-width: 2px; fill: none; }
+			text.prov.hover { font-family: "SF Bold"; fill: orange; }
+			text.prov.selected { font-family: "SF Bold"; }
+			path#crosser, path#underline, path.forced-cross {
+				stroke-width: 2px; fill: none;
+				&#crosser { stroke: orange; }
+				&.forced-cross { stroke: lightslategrey; }
+				&#underline { stroke: red; }
+			}
+			path.forced-underline { stroke: lightslategrey; fill: none; stroke-width: 1px; stroke-opacity: .4; }
 			path.polygons { opacity: 0; }
 			circle#onhover { fill: none; stroke: black; stroke-width: 2px; }
 			line.plot { stroke: lightslategrey; &.forced { display: block!important; }}
