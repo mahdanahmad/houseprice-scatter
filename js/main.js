@@ -1,8 +1,8 @@
 const tabs		= [
-	{ key: 'A', text: '0 - 75 m&#178' },
-	{ key: 'B', text: '76 - 150 m&#178' },
-	{ key: 'C', text: '150 - 300 m&#178' },
-	{ key: 'D', text: '300+ m&#178' },
+	{ key: 'A', text: '0 - 50 m&#178' },
+	{ key: 'B', text: '51 - 100 m&#178' },
+	{ key: 'C', text: '101 - 200 m&#178' },
+	{ key: 'D', text: '200+ m&#178' },
 ];
 const plotWidth	= 6;
 
